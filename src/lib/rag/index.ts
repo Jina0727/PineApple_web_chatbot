@@ -8,12 +8,11 @@
  *   - 끄려면 env `HYBRID_SEARCH=off` (벡터 단독으로 동작).
  */
 
-import fs from "node:fs";
-import path from "node:path";
 import { chunk } from "./chunk";
 import { embed, embedAll, embeddingProvider } from "./embeddings";
 import { VectorStore, type SearchResult } from "./store";
 import { BM25Index } from "./bm25";
+import { knowledgeFiles } from "./kb.generated";
 
 // 하이브리드 검색 on/off — 기본 off.
 //   이 규모(OpenAI 임베딩 + ~116조각)에선 벡터 단독이 eval상 더 정확했다(16/16 vs 15/16):
@@ -41,17 +40,11 @@ interface RagIndex {
 let indexPromise: Promise<RagIndex> | null = null;
 
 async function buildIndex(): Promise<RagIndex> {
-  // 1) data 폴더의 모든 .md 파일을 읽어 청킹한다.
-  const dataDir = path.join(process.cwd(), "data");
-  const files = fs
-    .readdirSync(dataDir)
-    .filter((f) => f.endsWith(".md"))
-    .sort();
-
+  // 1) 빌드 시점에 인라인된 지식베이스(data/*.md)를 청킹한다.
+  //    런타임 fs 대신 번들 모듈(kb.generated.ts)을 써서 서버리스 배포에서도 안전하다.
   const texts: string[] = [];
-  for (const file of files) {
-    const raw = fs.readFileSync(path.join(dataDir, file), "utf-8");
-    for (const c of chunk(raw)) texts.push(c.text);
+  for (const { content } of knowledgeFiles) {
+    for (const c of chunk(content)) texts.push(c.text);
   }
 
   // 2) 벡터 인덱스 (의미 검색용)
@@ -65,7 +58,7 @@ async function buildIndex(): Promise<RagIndex> {
   bm25.build();
 
   console.log(
-    `[RAG] 색인 완료: ${files.length}개 파일, ${store.size}개 조각 ` +
+    `[RAG] 색인 완료: ${knowledgeFiles.length}개 파일, ${store.size}개 조각 ` +
       `(임베딩=${embeddingProvider}, 하이브리드=${HYBRID ? "on" : "off"})`,
   );
   return { store, bm25 };
