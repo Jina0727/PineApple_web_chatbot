@@ -1,0 +1,48 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# env — 절대 커밋하지 마세요 (API 키 포함)
+.env
+.env.local
+.env*.local
+
+# transformers.js 모델 캐시
+/.cache
+**/.cache
+
+# misc
+.DS_Store
+*.pem
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# 배포 (Vercel)
+.vercel
+
+# 에디터 / IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# 로그
+*.log
+
+# 내부 문서 (git 제외 — 로컬에는 남음)
+docs/architecture.md

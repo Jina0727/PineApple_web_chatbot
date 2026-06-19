@@ -1,0 +1,28 @@
+{
+  "name": "softstory-chatbot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "RAG-based marketing chatbot for Soft Story Corp (Next.js + OpenAI GPT-4o mini)",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "eval": "tsx -r dotenv/config eval/run.ts dotenv_config_path=.env.local"
+  },
+  "dependencies": {
+    "@xenova/transformers": "^2.17.2",
+    "next": "^14.2.5",
+    "openai": "^6.44.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "dotenv": "^17.4.2",
+    "tsx": "^4.22.4",
+    "typescript": "^5.5.3"
+  }
+}
