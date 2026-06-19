@@ -69,7 +69,8 @@ npm run dev
 │       │   ├── embeddings.ts     # 텍스트 → 벡터 (OpenAI 기본 / 로컬 토글)
 │       │   ├── chunk.ts          # 문서 → 조각(chunk) 자르기
 │       │   ├── store.ts          # 인메모리 벡터 저장소 + 코사인 유사도  ← RAG의 심장
-│       │   └── index.ts          # 색인(ingestion) + 검색(retrieve) 오케스트레이션
+│       │   ├── bm25.ts           # 키워드(BM25) 검색 — 하이브리드용 (기본 off)
+│       │   └── index.ts          # 색인 + 검색 + 하이브리드 융합(RRF)
 │       └── prompt.ts             # 검색 결과를 끼워넣은 시스템 프롬프트 생성
 ├── .env.local.example
 ├── next.config.mjs
@@ -100,6 +101,6 @@ npm run dev
 - [ ] 검색된 출처(어느 문단에서 답이 나왔는지)를 화면에 표시 — RAG 디버깅에 유용
 - [ ] 인메모리 저장소 → 실제 벡터 DB(pgvector, Chroma, LanceDB)로 교체
 - [x] ~~임베딩 OpenAI 전환~~ — 완료(기본값). e5 대비 검색 품질·점수 분리 개선, 서버리스 호환
-- [ ] 하이브리드 검색(벡터 + 키워드 BM25) — 일반 질의 검색 정확도 추가 보강
+- [x] ~~하이브리드 검색(벡터+BM25)~~ — 구현 완료(기본 off; 이 규모에선 벡터 단독이 더 정확). `HYBRID_SEARCH=on` 토글
 - [ ] 문의 폼 연동 (견적 문의로 자연스럽게 유도)
 - [ ] 우측 하단 플로팅 위젯 UI

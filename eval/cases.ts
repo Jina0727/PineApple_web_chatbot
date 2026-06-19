@@ -30,6 +30,10 @@ export const cases: EvalCase[] = [
   { q: "What dubbing services do you offer?", expect: ["dubbing", "Korean"] },
   { q: "How can I get a quote?", expect: ["business@softstorycorp.com", "quote", "inquiry"] },
 
+  // --- 키워드/고유명사 (하이브리드 검색이 강한 영역) ---
+  { q: "타이거 블레이드 게임도 더빙했나요?", expect: ["타이거", "VR"] },
+  { q: "Neumann 마이크로 녹음하나요?", expect: ["Neumann"] },
+
   // --- 환각 방지: KB에 없는 주제 → threshold가 걸러 검색결과가 비어야 통과 ---
   { q: "오늘 서울 날씨 알려줘", expect: [] },
   { q: "비트코인 시세가 얼마야?", expect: [] },

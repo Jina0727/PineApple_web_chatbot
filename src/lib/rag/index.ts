@@ -1,11 +1,11 @@
 /**
  * RAG 오케스트레이션 — 색인(ingestion)과 검색(retrieve)을 한곳에서 묶는다.
  *
- *  [색인]  knowledge-base.md → 청킹 → 임베딩 → VectorStore에 적재   (서버에서 1회)
- *  [검색]  사용자 질문 → 임베딩 → VectorStore.search() → 상위 K개 조각
+ *  [색인]  data/*.md → 청킹 → (벡터 임베딩 + BM25 키워드) 두 인덱스 적재   (서버에서 1회)
+ *  [검색]  질문 → 벡터 검색으로 '관련성 게이트' → 통과하면 벡터+BM25를 RRF로 융합
  *
- * 색인은 비싸므로(임베딩 모델 로딩 + 전 조각 임베딩) Promise를 캐시해 단 한 번만 한다.
- * 지식베이스를 수정했다면 서버를 재시작하면 다시 색인된다.
+ * 하이브리드 검색: 벡터(의미)와 BM25(정확한 단어)를 결합해 검색 정확도를 높인다.
+ *   - 끄려면 env `HYBRID_SEARCH=off` (벡터 단독으로 동작).
  */
 
 import fs from "node:fs";
@@ -13,52 +13,15 @@ import path from "node:path";
 import { chunk } from "./chunk";
 import { embed, embedAll, embeddingProvider } from "./embeddings";
 import { VectorStore, type SearchResult } from "./store";
+import { BM25Index } from "./bm25";
 
-let storePromise: Promise<VectorStore> | null = null;
+// 하이브리드 검색 on/off — 기본 off.
+//   이 규모(OpenAI 임베딩 + ~116조각)에선 벡터 단독이 eval상 더 정확했다(16/16 vs 15/16):
+//   임베딩이 좋아 고유명사도 의미검색으로 잡혀, BM25가 보태는 건 노이즈뿐이었다.
+//   하이브리드의 이점은 임베딩이 약하거나(local 모드) KB가 훨씬 커질 때 나타난다.
+//   `HYBRID_SEARCH=on`으로 켜서 직접 비교해 볼 수 있다(`npm run eval`).
+const HYBRID = (process.env.HYBRID_SEARCH ?? "off").toLowerCase() === "on";
 
-async function buildStore(): Promise<VectorStore> {
-  // 1) data 폴더의 모든 .md 파일을 읽는다.
-  //    (knowledge-base.md = 한국어, knowledge-base-en.md = 영어 … 파일을 추가만 하면 자동 색인)
-  const dataDir = path.join(process.cwd(), "data");
-  const files = fs
-    .readdirSync(dataDir)
-    .filter((f) => f.endsWith(".md"))
-    .sort();
-
-  // 2) 파일마다 청킹해서 한데 모은다.
-  const texts: string[] = [];
-  for (const file of files) {
-    const raw = fs.readFileSync(path.join(dataDir, file), "utf-8");
-    for (const c of chunk(raw)) texts.push(c.text);
-  }
-
-  // 3) 모든 조각을 임베딩 ("passage:" 접두사)
-  const vectors = await embedAll(texts, "passage");
-
-  // 4) 저장소에 적재
-  const store = new VectorStore();
-  texts.forEach((t, i) => store.add({ text: t, embedding: vectors[i] }));
-
-  console.log(
-    `[RAG] 지식베이스 색인 완료: ${files.length}개 파일, ${store.size}개 조각 (임베딩=${embeddingProvider})`,
-  );
-  return store;
-}
-
-/** 색인된 저장소를 얻는다(최초 1회만 실제 색인 수행). */
-export function getStore(): Promise<VectorStore> {
-  if (!storePromise) storePromise = buildStore();
-  return storePromise;
-}
-
-/**
- * 질문과 의미가 가까운 지식 조각 topK개를 찾는다.
- * @param query 사용자 질문
- * @param topK  가져올 조각 수 (기본 3)
- */
-// 최소 유사도 컷오프. 이보다 낮은 조각은 '관련 없음'으로 보고 컨텍스트에 넣지 않는다.
-// → 관련 자료가 없을 때 GPT가 지어내지 않고 '문의 안내'로 빠지게 하는 환각 방지 장치.
-// e5 점수는 전반적으로 높게 몰려 있으니, 값은 `npm run eval`로 점수 분포를 보고 튜닝하세요.
 // 최소 유사도 컷오프 — 임베딩 제공자마다 점수 분포가 달라 기본값이 다르다(둘 다 eval로 보정).
 //   · local(e5-small):                무관~0.82 / 관련 0.84+  → 0.83 (간격이 좁아 빠듯)
 //   · openai(text-embedding-3-small):  무관~0.22 / 관련 0.28+  → 0.25 (간격이 ~4.5배 넓어 안정적)
@@ -67,20 +30,118 @@ const MIN_SCORE = Number(
   process.env.RAG_MIN_SCORE ?? (embeddingProvider === "local" ? 0.83 : 0.25),
 );
 
-export async function retrieve(query: string, topK = 3): Promise<SearchResult[]> {
-  const store = await getStore();
-  const queryEmbedding = await embed(query, "query"); // 질문은 "query:" 접두사
-  const all = store.search(queryEmbedding, topK);
-  const results = all.filter((r) => r.score >= MIN_SCORE); // ← 임계값 컷
+// 각 검색기(벡터/BM25)에서 융합 전에 가져올 후보 수
+const CANDIDATES = 10;
 
-  // 학습용: 통과/탈락 조각과 점수를 서버 터미널에서 확인 (threshold 튜닝에 유용).
+interface RagIndex {
+  store: VectorStore;
+  bm25: BM25Index;
+}
+
+let indexPromise: Promise<RagIndex> | null = null;
+
+async function buildIndex(): Promise<RagIndex> {
+  // 1) data 폴더의 모든 .md 파일을 읽어 청킹한다.
+  const dataDir = path.join(process.cwd(), "data");
+  const files = fs
+    .readdirSync(dataDir)
+    .filter((f) => f.endsWith(".md"))
+    .sort();
+
+  const texts: string[] = [];
+  for (const file of files) {
+    const raw = fs.readFileSync(path.join(dataDir, file), "utf-8");
+    for (const c of chunk(raw)) texts.push(c.text);
+  }
+
+  // 2) 벡터 인덱스 (의미 검색용)
+  const vectors = await embedAll(texts, "passage");
+  const store = new VectorStore();
+  texts.forEach((t, i) => store.add({ text: t, embedding: vectors[i] }));
+
+  // 3) BM25 키워드 인덱스 (정확한 단어 검색용)
+  const bm25 = new BM25Index();
+  texts.forEach((t) => bm25.add(t));
+  bm25.build();
+
   console.log(
-    `[RAG] 질문="${query.slice(0, 40)}…" → 통과 ${results.length}/${all.length} (컷오프 ${MIN_SCORE}):`,
-    all.map(
-      (r) =>
-        `${r.score >= MIN_SCORE ? "✓" : "✗"}(${r.score.toFixed(3)}) ${r.text.slice(0, 24)}…`,
-    ),
+    `[RAG] 색인 완료: ${files.length}개 파일, ${store.size}개 조각 ` +
+      `(임베딩=${embeddingProvider}, 하이브리드=${HYBRID ? "on" : "off"})`,
   );
+  return { store, bm25 };
+}
 
+/** 색인된 인덱스를 얻는다(최초 1회만 실제 색인 수행). */
+export function getIndex(): Promise<RagIndex> {
+  if (!indexPromise) indexPromise = buildIndex();
+  return indexPromise;
+}
+
+// RRF 가중치. 우리 임베딩(OpenAI)이 강해서 벡터를 더 신뢰하고, BM25는 보조 부스터로 둔다.
+// (동일 가중이면 '작업' 같은 흔한 단어 질문에서 BM25 노이즈가 좋은 벡터 결과를 덮을 수 있음 — eval로 확인)
+const W_VECTOR = 2;
+const W_BM25 = 1;
+
+/**
+ * RRF (Reciprocal Rank Fusion) — 여러 검색기의 '순위'를 합치는 표준 융합법.
+ *   각 항목 점수 = Σ weight × 1/(k + 순위).  점수 정규화가 필요 없어 견고하다(k=60이 관례).
+ * 벡터와 BM25는 점수 스케일이 완전히 달라서, 점수가 아니라 '순위'로 합친다.
+ */
+function rrfFuse(
+  lists: { items: { text: string }[]; weight: number }[],
+  k = 60,
+): string[] {
+  const score = new Map<string, number>();
+  for (const { items, weight } of lists) {
+    items.forEach((item, rank) => {
+      score.set(item.text, (score.get(item.text) ?? 0) + weight / (k + rank + 1));
+    });
+  }
+  return [...score.entries()].sort((a, b) => b[1] - a[1]).map(([text]) => text);
+}
+
+/**
+ * 질문과 관련된 지식 조각 topK개를 찾는다.
+ * 1) 벡터 검색으로 관련성을 판단(게이트) → 관련 없으면 빈 결과(환각 방지)
+ * 2) 통과하면 벡터 + BM25를 RRF로 융합해 순위 결정
+ */
+export async function retrieve(query: string, topK = 3): Promise<SearchResult[]> {
+  const { store, bm25 } = await getIndex();
+  const qVec = await embed(query, "query");
+
+  // 1) 벡터 검색 — 전체 조각을 코사인 순으로 (소규모라 전수 계산 OK)
+  const vecRanked = store.search(qVec, store.size);
+  const cosineByText = new Map(vecRanked.map((r) => [r.text, r.score]));
+
+  // 2) 관련성 게이트: 최고 코사인이 컷오프 미만이면 'KB에 없는 질문' → 빈 결과
+  if (vecRanked.length === 0 || vecRanked[0].score < MIN_SCORE) {
+    console.log(
+      `[RAG] "${query.slice(0, 30)}…" → 관련 자료 없음 ` +
+        `(top 코사인 ${vecRanked[0]?.score.toFixed(3) ?? "—"} < ${MIN_SCORE})`,
+    );
+    return [];
+  }
+
+  // 3) 하이브리드 off면 코사인 상위 topK 그대로
+  if (!HYBRID) {
+    return vecRanked.slice(0, topK);
+  }
+
+  // 4) 하이브리드: 벡터 top-N + BM25 top-N 을 RRF로 융합
+  const vecTop = vecRanked.slice(0, CANDIDATES);
+  const bmTop = bm25.search(query, CANDIDATES);
+  const fusedTexts = rrfFuse([
+    { items: vecTop, weight: W_VECTOR },
+    { items: bmTop, weight: W_BM25 },
+  ]).slice(0, topK);
+  const results = fusedTexts.map((text) => ({
+    text,
+    score: cosineByText.get(text) ?? 0, // 표시는 코사인으로(해석 쉬움), 순위는 RRF
+  }));
+
+  console.log(
+    `[RAG] "${query.slice(0, 30)}…" → 하이브리드 ${results.length}개 ` +
+      `(벡터+BM25 RRF, BM25매칭 ${bmTop.length}개, top코사인 ${vecRanked[0].score.toFixed(3)})`,
+  );
   return results;
 }

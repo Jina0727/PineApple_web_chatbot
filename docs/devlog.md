@@ -90,11 +90,32 @@ src/components/Chat.tsx     채팅 UI
 
 ---
 
+## 2026-06-19 (이어서) — 하이브리드 검색: 구현 후 측정으로 기본 off
+
+### 8. 하이브리드 검색 (벡터 + BM25)
+
+- **목적**: 고유명사·정확한 용어에 강한 키워드 검색(BM25)을 의미검색(벡터)에 결합해 정확도 향상.
+- **구현**: `bm25.ts`에 BM25를 **직접 구현**(한국어는 2-gram 토큰화). `index.ts`에서 벡터+BM25를 **RRF(Reciprocal Rank Fusion)**로 융합(벡터 가중 2 : BM25 1). 관련성 게이트(벡터 코사인 컷오프)는 유지.
+- **측정 (eval로 비교)**: 벡터 단독 **16/16** vs 하이브리드 **15/16**.
+  - OpenAI 임베딩이 고유명사("타이거 블레이드", "Neumann")까지 의미로 이미 잘 잡아, 이 규모(116조각)에선 BM25가 노이즈만 추가. "어떤 작업…" 같은 흔한 단어 질문에서 좋은 벡터 결과를 덮음(벡터 가중치를 높여도 회복 안 됨).
+- **결정**: 하이브리드는 **구현해두되 기본 off** (`HYBRID_SEARCH=on`으로 토글). 이점은 **임베딩이 약하거나(local) KB가 커질 때** 나타나므로 그때를 위한 도구로 보유.
+- **교훈**: "더 많은 기계장치 ≠ 더 좋음." 도입 전에 측정한 게 답을 줬다.
+
+### 9. 배포 준비 (Vercel)
+
+- **GitHub 푸시**: 초기 커밋 후, 하이브리드·배포설정까지 push (repo: github.com/Jina0727/PineApple_web_chatbot). `.env.local`(실제 키)은 gitignore로 제외 확인.
+- **서버리스 대비 `next.config.mjs` 2가지**:
+  - `outputFileTracingIncludes`로 `data/**` 함수 번들에 포함 — 동적 `fs.readFileSync`라 자동 추적이 안 되기 때문(없으면 배포 후 지식베이스 못 읽어 에러).
+  - `outputFileTracingExcludes`로 `@xenova/transformers`·`onnxruntime-node` 제외 — OpenAI 임베딩이 기본이라 런타임 불필요, 함수 크기 250MB 한도 폭증 방지.
+- **배포 흐름**: Vercel에서 이 GitHub repo import → 환경변수 `OPENAI_API_KEY` 등록 → 배포. `.env.local`은 커밋 안 되므로 **Vercel 대시보드에 환경변수를 직접 등록**해야 함.
+
+---
+
 ## 현재 상태
 
 - **구성**: Next.js 14 + TypeScript / 생성=`gpt-4o-mini` / 임베딩=`text-embedding-3-small`(기본) / 인메모리 벡터검색.
 - **지식베이스**: 한국어 + 영어 (사이트 30페이지 기반, FAQ 포함).
-- **품질 장치**: 환각 가드, threshold(openai 0.25 / local 0.83), rate limit, 입력/히스토리 cap, 검색 eval(14/14).
+- **품질 장치**: 환각 가드, threshold(openai 0.25 / local 0.83), rate limit, 입력/히스토리 cap, 검색 eval(**16/16**), 하이브리드 검색(구현·기본 off).
 - **검증**: `next build` ✅, `npm run eval` ✅ 14/14.
 - **실행**: `.env.local`에 `OPENAI_API_KEY` 입력 후 `npm run dev` → http://localhost:3000.
 
@@ -102,7 +123,7 @@ src/components/Chat.tsx     채팅 UI
 
 - [ ] **배포(Vercel)** — 공개 URL 확보 (`data/` outputFileTracing 포함)
 - [ ] **사이트 위젯 임베드** — softstorycorp.com에 iframe 또는 직접 통합
-- [ ] **하이브리드 검색**(벡터 + 키워드 BM25) — 일반 질의 검색 정확도 한 단계 더
+- [x] ~~하이브리드 검색(벡터+BM25)~~ — 구현 완료, 측정 결과 **기본 off**(벡터 단독 16/16 > 하이브리드 15/16). `HYBRID_SEARCH=on` 토글
 - [ ] **출처 표시 UI** — 어떤 문단에서 답이 나왔는지 화면에 노출
 - [ ] **실무 정보 보강** — 가격/납품포맷/수정정책 등(사이트에 없어 현재는 "문의 안내"로 처리)
 
@@ -115,3 +136,4 @@ src/components/Chat.tsx     채팅 UI
 | `EMBEDDING_PROVIDER` | `openai` | `local`로 로컬 임베딩 전환 |
 | `OPENAI_EMBED_MODEL` | `text-embedding-3-small` | 임베딩 모델 |
 | `RAG_MIN_SCORE` | openai 0.25 / local 0.83 | 검색 유사도 컷오프 |
+| `HYBRID_SEARCH` | `off` | `on`이면 벡터+BM25 하이브리드 검색 |
