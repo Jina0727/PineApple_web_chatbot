@@ -23,6 +23,14 @@ const SUGGESTIONS = [
   "견적은 어떻게 문의하나요?",
 ];
 
+// 봇 답변에 섞여 나오는 마크다운 서식 기호를 제거해 평범한 텍스트로 보여준다.
+function toPlain(text: string): string {
+  return text
+    .replace(/\*+/g, "") // **굵게**, *기울임* 마커
+    .replace(/`+/g, "") // 백틱
+    .replace(/^\s*#{1,6}\s+/gm, ""); // 제목 #
+}
+
 export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -124,7 +132,15 @@ export default function Chat() {
         ) : (
           messages.map((m, i) => (
             <div key={i} className={`bubble bubble--${m.role}`}>
-              {m.content || <span className="bubble__typing">···</span>}
+              {m.content ? (
+                m.role === "assistant" ? toPlain(m.content) : m.content
+              ) : (
+                <span className="typing">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </span>
+              )}
             </div>
           ))
         )}

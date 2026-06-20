@@ -111,6 +111,26 @@ src/components/Chat.tsx     채팅 UI
 
 ---
 
+## 2026-06-20 — 배포 & 디버깅: "범인은 테스트 도구"
+
+### 10. Vercel 배포
+- GitHub import로 첫 배포(`d49e9c6`)는 됐지만, 이후 `git push` 자동배포가 안 됨(프로덕션이 22시간째 옛 커밋, "Ready **Stale**").
+- 해결: **Vercel CLI `vercel --prod`** 로 로컬 코드를 직접 배포. 공개 URL: https://pine-apple-web-chatbot.vercel.app
+
+### 11. "한국어만 실패" 디버깅 — 알고 보니 테스트 도구 문제
+- 증상: 배포 후 curl 테스트에서 **영어는 정상, 한국어는 전부 "문의 안내"로 빠짐.**
+- 헛다리: "한국어 KB가 배포에 누락"으로 추정 → KB를 빌드 시 인라인(`bundle-kb.mjs` → `kb.generated.ts`)하는 방식으로 전환. (이건 그 자체로 서버리스 파일추적 의존성을 없애는 개선이라 그대로 유지)
+- 진짜 원인: 진단용 `/api/health` 를 붙여 보니 **프로덕션에서 한국어 KB가 멀쩡히 색인됐고(2파일·116조각), "한국어 더빙" 질문이 0.657로 매칭**됨 → 검색은 정상이었음.
+- 결정타: `curl -d '...한국어...'`(인라인)는 **Git Bash/Windows에서 한국어를 CP949로 깨뜨려** 전송 → 프로덕션이 깨진 글자를 못 찾은 것. **UTF-8 파일(`--data-binary @file`)로 보내니 완벽한 한국어 답변.**
+- 교훈: 측정값이 모순될 때(health 0.657인데 chat 실패)는 **앱보다 테스트 경로를 먼저 의심**할 것. 윈도우에서 비ASCII는 CLI 인자 대신 파일로.
+
+### 12. 최종 검증 (프로덕션, UTF-8)
+- [KO] 한국어 더빙 / 하이브리드 60% / 회사주소·대표 → 모두 정확 ✅
+- [EN] 영어 질문 → 영어 답변 ✅
+- [무관] 비트코인 → 환각 가드 작동(안 지어냄) ✅
+
+---
+
 ## 현재 상태
 
 - **구성**: Next.js 14 + TypeScript / 생성=`gpt-4o-mini` / 임베딩=`text-embedding-3-small`(기본) / 인메모리 벡터검색.
@@ -121,7 +141,7 @@ src/components/Chat.tsx     채팅 UI
 
 ## 다음 후보
 
-- [ ] **배포(Vercel)** — 공개 URL 확보 (`data/` outputFileTracing 포함)
+- [x] ~~**배포(Vercel)**~~ — 완료: https://pine-apple-web-chatbot.vercel.app (한/영/환각가드 검증). KB는 빌드 시 인라인
 - [ ] **사이트 위젯 임베드** — softstorycorp.com에 iframe 또는 직접 통합
 - [x] ~~하이브리드 검색(벡터+BM25)~~ — 구현 완료, 측정 결과 **기본 off**(벡터 단독 16/16 > 하이브리드 15/16). `HYBRID_SEARCH=on` 토글
 - [ ] **출처 표시 UI** — 어떤 문단에서 답이 나왔는지 화면에 노출

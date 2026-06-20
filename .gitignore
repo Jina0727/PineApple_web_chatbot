@@ -49,3 +49,6 @@ docs/architecture.md
 
 # 참고: src/lib/rag/kb.generated.ts 는 일부러 '커밋'합니다(서버리스 빌드 안정성).
 #       data/*.md 를 바꾸면 npm run dev/build 가 자동으로 갱신합니다.
+
+.vercel
+.env*
