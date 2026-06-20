@@ -60,21 +60,21 @@
       "right:20px",
       "width:60px",
       "height:60px",
-      "border:0",
+      "border:1px solid #e6e8ec", // 흰 배경 버튼이라 가장자리를 살짝 잡아준다
       "border-radius:50%",
       "cursor:pointer",
-      "background:" + ACCENT,
-      "color:#1a1d24",
-      "font-size:26px",
+      "background:#ffffff", // 흰색 배경
+      "color:#1a1d24", // 닫기(✕) 글자 색 — 흰 배경 위에서 잘 보이게 어둡게
+      "font-size:28px",
       "line-height:1",
-      "box-shadow:0 8px 24px rgba(0,0,0,.35)",
+      "box-shadow:0 6px 20px rgba(0,0,0,.18)", // 흰 버튼에 맞춰 그림자 부드럽게
       "z-index:" + (Z + 1),
       "display:flex",
       "align-items:center",
       "justify-content:center",
       "transition:transform .15s ease",
     ].join(";");
-    btn.textContent = "💬";
+    btn.textContent = "🤖"; // AI/로봇 아이콘
     btn.onmouseenter = function () {
       btn.style.transform = "scale(1.06)";
     };
@@ -90,7 +90,7 @@
         ? "translateY(0) scale(1)"
         : "translateY(12px) scale(.98)";
       panel.style.pointerEvents = open ? "auto" : "none";
-      btn.textContent = open ? "✕" : "💬";
+      btn.textContent = open ? "✕" : "🤖";
       btn.setAttribute("aria-label", open ? "채팅 닫기" : "채팅 열기");
     }
     btn.addEventListener("click", function () {
