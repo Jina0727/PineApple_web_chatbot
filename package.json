@@ -6,8 +6,7 @@
   "scripts": {
     "predev": "node scripts/bundle-kb.mjs",
     "dev": "next dev",
-    "prebuild": "node scripts/bundle-kb.mjs",
-    "build": "next build",
+    "build": "node scripts/bundle-kb.mjs && next build",
     "start": "next start",
     "lint": "next lint",
     "eval": "node scripts/bundle-kb.mjs && tsx -r dotenv/config eval/run.ts dotenv_config_path=.env.local"

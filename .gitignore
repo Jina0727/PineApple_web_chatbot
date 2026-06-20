@@ -47,5 +47,5 @@ Desktop.ini
 # 내부 문서 (git 제외 — 로컬에는 남음)
 docs/architecture.md
 
-# 생성 파일 (빌드 시 scripts/bundle-kb.mjs가 자동 생성)
-src/lib/rag/kb.generated.ts
+# 참고: src/lib/rag/kb.generated.ts 는 일부러 '커밋'합니다(서버리스 빌드 안정성).
+#       data/*.md 를 바꾸면 npm run dev/build 가 자동으로 갱신합니다.
