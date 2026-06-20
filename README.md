@@ -90,9 +90,22 @@ npm run dev
 
 ## Soft Story 웹사이트에 붙이기 (위젯)
 
-이 앱은 독립 실행되는 채팅 페이지입니다. 실제 사이트(softstorycorp.com)에 띄우는 방법은
-[docs/architecture.md](docs/architecture.md)의 **"기존 사이트에 위젯으로 붙이기"** 절 참고.
-요약하면: Vercel에 배포 → 사이트에 `<iframe>` 또는 작은 스크립트로 챗 위젯 삽입.
+배포 후, softstorycorp.com 어느 페이지든 아래 **한 줄**만 넣으면 우측 하단에 챗 버튼이 뜹니다:
+
+```html
+<script src="https://pine-apple-web-chatbot.vercel.app/widget.js" defer></script>
+```
+
+- 버튼(💬) 클릭 → 챗봇 `/embed` 화면을 iframe 패널로 열고/닫음 (ESC로도 닫힘).
+- 스타일을 전부 인라인 처리해 호스트 사이트 CSS와 충돌하지 않음.
+- softstorycorp.com이 Next.js라면 `next/script`로 넣어도 됩니다:
+  ```tsx
+  import Script from "next/script";
+  <Script src="https://pine-apple-web-chatbot.vercel.app/widget.js" strategy="afterInteractive" />
+  ```
+
+구성: `public/widget.js`(플로팅 버튼+패널 주입) + `app/embed`(iframe 전용 챗 화면).
+iframe 없이 컴포넌트로 직접 통합하려면 [docs/architecture.md](docs/architecture.md) §6 참고.
 
 ---
 
