@@ -2,7 +2,7 @@
  * Soft Story 챗봇 임베드 위젯 — 어떤 사이트든 아래 한 줄로 우측 하단에 챗 버튼을 띄운다.
  *   <script src="https://pine-apple-web-chatbot.vercel.app/widget.js" defer></script>
  *
- * 동작: 플로팅 버튼(💬) 클릭 → /embed(챗 UI)를 iframe 패널로 열고 닫는다.
+ * 동작: 플로팅 버튼('Ask AI') 클릭 → /embed(챗 UI)를 iframe 패널로 열고 닫는다.
  * 호스트 사이트 CSS와 충돌하지 않도록 모든 스타일을 인라인으로 지정한다.
  */
 (function () {
@@ -58,15 +58,17 @@
       "position:fixed",
       "bottom:20px",
       "right:20px",
-      "width:60px",
-      "height:60px",
-      "border:1px solid #e6e8ec", // 흰 배경 버튼이라 가장자리를 살짝 잡아준다
-      "border-radius:50%",
+      "height:52px",
+      "padding:0 20px", // 알약형 버튼: 'Ask AI' 텍스트가 들어갈 가로 여백
+      "border:0", // 단색(인디고) 버튼이라 테두리 제거
+      "border-radius:999px", // 알약(pill) 모양
       "cursor:pointer",
-      "background:#ffffff", // 흰색 배경
-      "color:#1a1d24", // 닫기(✕) 글자 색 — 흰 배경 위에서 잘 보이게 어둡게
-      "font-size:28px",
+      "background:#4f46e5", // 인디고 — 사이트 'indigo-600' 버튼 색
+      "color:#ffffff", // 인디고 배경 위 흰 글자
+      "font-size:16px",
+      "font-weight:600",
       "line-height:1",
+      "white-space:nowrap",
       "box-shadow:0 6px 20px rgba(0,0,0,.18)", // 흰 버튼에 맞춰 그림자 부드럽게
       "z-index:" + (Z + 1),
       "display:flex",
@@ -74,7 +76,7 @@
       "justify-content:center",
       "transition:transform .15s ease",
     ].join(";");
-    btn.textContent = "🤖"; // AI/로봇 아이콘
+    btn.textContent = "Ask AI"; // 직관적인 텍스트 라벨
     btn.onmouseenter = function () {
       btn.style.transform = "scale(1.06)";
     };
@@ -90,7 +92,7 @@
         ? "translateY(0) scale(1)"
         : "translateY(12px) scale(.98)";
       panel.style.pointerEvents = open ? "auto" : "none";
-      btn.textContent = open ? "✕" : "🤖";
+      btn.textContent = open ? "✕" : "Ask AI";
       btn.setAttribute("aria-label", open ? "채팅 닫기" : "채팅 열기");
     }
     btn.addEventListener("click", function () {
