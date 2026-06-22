@@ -90,7 +90,7 @@ export async function POST(req: Request) {
   const retrieved = lastUser ? await retrieve(lastUser.content, 3) : [];
 
   // (5) 검색 결과를 시스템 프롬프트에 주입
-  const system = buildSystemPrompt(retrieved);
+  const system = buildSystemPrompt(retrieved, lastUser?.content);
 
   // (6) OpenAI 스트리밍 호출 → 브라우저로 그대로 전달
   const client = new OpenAI(); // OPENAI_API_KEY 환경변수를 자동으로 사용

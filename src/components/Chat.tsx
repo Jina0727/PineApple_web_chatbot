@@ -17,10 +17,10 @@ interface Message {
 
 // 처음 화면에 보여줄 추천 질문(빠른 시작용 칩)
 const SUGGESTIONS = [
-  "어떤 서비스를 제공하나요?",
-  "한국어 더빙과 하이브리드 더빙의 차이는?",
-  "AI 보이스(Fineapple Voice)는 뭔가요?",
-  "견적은 어떻게 문의하나요?",
+  "어떻게 시작하나요?",
+  "성우는 어떻게 골라요?",
+  "감정 톤은 어떻게 써요?",
+  "긴 글도 만들 수 있나요?",
 ];
 
 // 봇 답변에 섞여 나오는 마크다운 서식 기호를 제거해 평범한 텍스트로 보여준다.
@@ -101,10 +101,10 @@ export default function Chat() {
     <div className="chat">
       <header className="chat__header">
         <div className="chat__brand">
-          <span className="chat__logo">🎙️</span>
+          <span className="chat__logo">🍍</span>
           <div>
-            <strong>Soft Story</strong>
-            <p>성우 녹음 · 더빙 · AI 보이스 안내 챗봇</p>
+            <strong>FineApple Voice</strong>
+            <p>AI 성우 사용 도우미</p>
           </div>
         </div>
       </header>
@@ -112,9 +112,9 @@ export default function Chat() {
       <div className="chat__messages" ref={scrollRef}>
         {messages.length === 0 ? (
           <div className="chat__welcome">
-            <p className="chat__welcome-title">안녕하세요! 무엇이 궁금하신가요? 👋</p>
+            <p className="chat__welcome-title">처음 오셨나요? 반가워요 👋</p>
             <p className="chat__welcome-sub">
-              Soft Story의 더빙·성우 녹음·AI 보이스 서비스에 대해 답해드려요.
+              성우 고르기부터 첫 음성 만들기까지 안내해 드려요. (한국어 · English OK)
             </p>
             <div className="chat__chips">
               {SUGGESTIONS.map((q) => (

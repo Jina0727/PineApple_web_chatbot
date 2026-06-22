@@ -45,7 +45,7 @@
 
     var iframe = document.createElement("iframe");
     iframe.src = CHAT_URL;
-    iframe.title = "Soft Story 챗봇";
+    iframe.title = "FineApple Voice 도우미";
     iframe.setAttribute("loading", "lazy");
     iframe.style.cssText = "width:100%;height:100%;border:0;display:block;";
     panel.appendChild(iframe);
